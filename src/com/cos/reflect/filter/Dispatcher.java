@@ -2,7 +2,10 @@ package com.cos.reflect.filter;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.util.Enumeration;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -15,6 +18,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.cos.reflect.anno.RequestMapping;
 import com.cos.reflect.controller.UserController;
+import com.cos.reflect.controller.dto.LoginDto;
 
 public class Dispatcher implements Filter {
 
@@ -48,22 +52,47 @@ public class Dispatcher implements Filter {
 		
 		for (Method method : methods) { // 4바퀴 (join, login, user, hello)
 			Annotation annotation = method.getDeclaredAnnotation(RequestMapping.class);
-			RequestMapping requestMapping = (RequestMapping) annotation;
+			RequestMapping requestMapping = (RequestMapping) annotation; //.value 호출하기 위해 다운캐스팅
 			System.out.println(requestMapping.value());
 			 //위에서부터 아래로 찾음
 			if(requestMapping.value().equals(endPoint)) {
 				try {
-					String path = (String)method.invoke(userController);// '/' 받음
-					System.out.println(path);
-					RequestDispatcher dis = request.getRequestDispatcher(path);
-					dis.forward(request, response);//RequestDispatcher를 사용하면, 
-					//내부적으로 전달하기 때문에, web.xml를 다시 타지 않는다.
-					//여기서 함수를 실행해서 받은 request, response 객체를 그대로 전송한다. 
+					System.out.println("들왔나?");
+					Parameter[] params = method.getParameters();//login(LoginDto dto) 여기가 왜 0?
+					String path = null;  
+				
+					System.out.println(params.length);
 					
+					if(params.length != 0) {	
 					
-					//response.sendRedirect("index.jsp");//만약 sendredirect를 한다면, req,resp
-					//객체를 새로 생성하는 것이기 때문에 다시 web.xml를 타고 들어옴
-					//그래서 필터에 걸림.
+						System.out.println("params[0].getType() : "+params[0].getType());
+						//Object dtoInstance = params[0].getType().newInstance(); // /user/login => LoginDto, /user/join => JoinDto
+						// 해당 오브젝트를 리플렉션해서 set함수 호출
+//						Object dtoInstance = params[0].getType().newInstance();
+//						LoginDto.class.newInstance();
+						Object dtoInstance = Class.forName(params[0].getType().toString()); //newinstance가 안 먹힘
+						
+						String username = request.getParameter("username");
+						String password = request.getParameter("password");
+						System.out.println("username : "+username);
+						System.out.println("password : "+password);
+						
+						Enumeration<String> keys = request.getParameterNames(); //username, password 크기가 2
+						// keys 값을 변형 username => setUsername
+						// keys 값을 변형 password => setPassword
+						
+						while(keys.hasMoreElements()) {
+							System.out.println(keys.nextElement());
+						}
+						path = "/";
+										
+					}else {						
+						path = (String)method.invoke(userController);						
+					}
+					
+					RequestDispatcher dis = request.getRequestDispatcher(path); // 필터를 다시 안탐!!
+					dis.forward(request, response);
+
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
